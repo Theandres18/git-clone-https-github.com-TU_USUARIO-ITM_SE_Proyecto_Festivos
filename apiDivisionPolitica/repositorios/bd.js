@@ -13,13 +13,13 @@ module.exports = {
         try {
             await cliente.connect();
             basedatos = cliente.db(configuracion.BASEDATOS);
-            return basedatos;
+            console.log("se ha establecido conexion a la base de datos");
         } catch (error) {
             console.log(error);
         }
     },
     desconectar: async () => {
-        await client.close();
+        await cliente.close();
     },
     obtenerBD: () => basedatos
 
