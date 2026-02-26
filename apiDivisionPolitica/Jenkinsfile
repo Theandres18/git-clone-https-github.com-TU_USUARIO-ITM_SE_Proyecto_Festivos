@@ -1,0 +1,76 @@
+pipeline {
+    agent any
+/*
+    triggers {
+        pollSCM('H/15 * * * *') // verifica cambios cada 15 min
+    }
+*/
+    environment {
+        REPO_URL = 'https://github.com/frayosorio/apiDivisionPolitica_ExpressJS.git'
+        BRANCH = 'main'
+        DOCKER_IMAGE = 'apidivisionpolitica:latest'
+        DOCKER_NETWORK = 'dockerdivisionpolitica_red'       // Variable para la red
+        CONTAINER_NAME = 'dockerapidivisionpolitica'       // Variable para el nombre del contenedor
+    }
+
+    stages {
+        stage('Clonar Repositorio') {
+            steps {
+                git branch: "${BRANCH}", credentialsId: '100', url: "${REPO_URL}"
+            }
+        }
+
+        stage('Construir Imagen Docker') {
+            steps {
+                script {
+                    bat 'docker build -t %DOCKER_IMAGE% .'
+                }
+            }
+        }
+/*
+        stage('Detener Contenedor Anterior') {
+            steps {
+                script {
+                    bat '''
+                    docker ps -q --filter "name=dockerapidivisionpolitica" | findstr . && docker stop dockerapidivisionpolitica || echo No hay contenedor en ejecución
+                    docker ps -a -q --filter "name=dockerapidivisionpolitica" | findstr . && docker rm dockerapidivisionpolitica || echo No hay contenedor detenido
+                    '''
+                    
+                }
+            }
+        }
+*/
+        stage('Limpiar contenedor existente') {
+            steps {
+                script {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        bat """
+                        docker container inspect %CONTAINER_NAME% >nul 2>&1 && (
+                            docker container stop %CONTAINER_NAME%
+                            docker container rm %CONTAINER_NAME%
+                        ) || echo "No existe el contenedor '%CONTAINER_NAME%'."
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Desplegar Contenedor Docker') {
+            steps {
+                script {
+                    bat "docker container run --network %DOCKER_NETWORK% --name %CONTAINER_NAME% -p 9080:3030 -d %DOCKER_IMAGE%"
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Despliegue exitoso.'
+        }
+        failure {
+            echo 'Despliegue fallido.'
+        }
+    }
+}
+
